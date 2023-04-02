@@ -1,20 +1,17 @@
 ////**************************************************************************************
 //// Date: 03/31/2023
 //// Author: Bo Yang, Selvaprabu Nadarajah, Nicola Secomandi
-//// Description: C++ Implementation for Pathwise Optimization for Merchant Energy Production
-////              24-stage Ethanol Production: Jan Instance
+//// Description: C++ Implementation of Pathwise Optimization for Merchant Energy Production
+////              24-stage Ethanol Production: January Instance
 ////              BCD Algorithm with Greedy Block Selection Rule
 ////              High Order Polynomial Basis Functions
-//// Parameter Details: 70,000 Samples for Pathwise Linear Program
-////                    500,000 Samples for Unbiased Lower and Dual (Upper) Bounds
-////                    7 Blocks for Each BCD Iteration
-////                    
+//// 
+////              All functions are contained in this cpp file                   
 ////**************************************************************************************
 
 //*********************************************
 // Standard Headers
 //*********************************************
-#include "gurobi_c++.h"
 #include <string>
 #include <stdlib.h>
 #include <sstream>
@@ -32,8 +29,9 @@
 #include <complex>
 
 //*******************************
-//External Libraries
+//External Headers
 //*******************************
+#include "gurobi_c++.h"
 #include"dataanalysis.h"
 #include <lapacke.h>
 #include <cblas.h>
@@ -102,13 +100,14 @@ static const double salvage_value = 0; // Salvage value for the abandonment
 static const int time_lag_mothball = 1; // Time lag for the action "Mothball"
 static const int time_lag_reactivation = 1; // Time lag for the action "Reactivate"
 static const int time_lag = 0;
+
 //*****************************************
 // Parameters for the BCD Algorithm
 //*****************************************
 const int NumOfSamplePath = 70000; 
 // Sample Number for Pathwise Linear Program
 
-const int numofsamples = 100000; 
+const int numofsamples = 500000; 
 // Sample Number Unbiased Bound Simulation
 
 const int nofcoeffs = 3 * 3 * (stage - 1) + 3 * (stage - 2); 
@@ -123,7 +122,7 @@ long long Number_Of_Beta = 0;
 //***************************************************
 // Parameters for the PCA Preconditioning Procedure
 //***************************************************
-int magnitude = -8;
+int magnitude = -8; // Rescale a number up to 1e-8
 
 //***************************************************
 // Definitions of Functions for Sample Generation
@@ -160,8 +159,6 @@ void basisFunction(int, int, vector<vector<vector<vector<double> > > >&);
 string itos(int i) { stringstream s; s << i; return s.str(); }
 // Transfer Int to String
 
-//GRBLinExpr penaltyFunction(int, int, int, int, vector<vector<vector<vector<double>>>> &, struct_PriceModelInfo<vector<vector<vector<double> > > > &, int);
-
 GRBLinExpr penaltyFunction(int, int, int, int, int);
 // Return the dual penalty for each action. 
 // Note that this function returns a linear expression that contains corresponding Beta variables.
@@ -173,12 +170,6 @@ double PenaltyFunction(int, int, int, int,
 	int);
 // Return the dual penalty for each action. 
 // Note that this function returns the penalty value for fixed Beta variable values
-
-double PenaltyFunction(int action, int state, int current_stage, int nofcoeffs,
-	vector<vector<vector<double>>> &coefficient,
-	int TotalLoop);
-
-//GRBLinExpr penaltyexpression(int state, int current_stage);
 
 void BasisSubtraction(int current_stage,
 	vector<vector<vector<vector<double>>>> &futures_price,
@@ -219,19 +210,10 @@ void generation_A_matrix(int TotalLoop, double*** matrix_A);
 // Store a coefficient matrix for the regression that is used to obtain VFAs for the unbiased lower bound 
 // (Please see the regression before \S 5 for details)
 
-//void Beta_Matrix_Construction(int, int, int, int, 
-//	vector<vector<vector<vector<double>>>> &, 
-//	struct_PriceModelInfo<vector<vector<vector<double> > > > &, 
-//	int, int);
-
-void Generate_Beta_Matrix(double* results, double *Beta_Matrix, int i);
-// Store the coefficient matrix for the Beta variables in PLP
-
 void Beta_Transformation(vector<vector<vector<double>>> &coefficient);
 // Project the Beta variables from the preconditioned space to the original space
 
 void Beta_Update(int i, vector<vector<double>> &beta_var);
-// 
 
 void inverse(double* A, int N);
 // Inverse the input matrix A
@@ -251,13 +233,26 @@ void Order_Magnitude(double *results, int i, int *scale, int *scale_R);
 //***********************************
 // Definitions of Variable Vectors
 //***********************************
-vector<vector<vector<double>>> coefficient; // Store the solution of Beta variables in the PLP
-vector<vector<vector<double>>> VFA_coefficient; // Store the VFA used for the unbiased lower bound
-double *****forwardcurve_Total = new double****[NumOfSamplePath]; // Store all forward curve samples
-GRBVar value_vars[NumOfSamplePath][stage][max_state]; // U variables in PLP
-GRBVar coeff_vars[stage][max_state][nofcoeffs]; // Beta variables in PLP
-GRBVar Value_vars[stage][max_state]; // U variables used for unbiased dual (upper) bound
-int zeroposition[nofcoeffs + 1] = { 0 }; // Vector to store the position of the null column in the post PCA coefficient matrix
+vector<vector<vector<double>>> coefficient; 
+// Store the solution of Beta variables in the PLP
+
+vector<vector<vector<double>>> VFA_coefficient; 
+// Store the VFA used for the unbiased lower bound
+
+double *****forwardcurve_Total = new double****[NumOfSamplePath]; 
+// Store all forward curve samples
+
+GRBVar value_vars[NumOfSamplePath][stage][max_state]; 
+// U variables in PLP
+
+GRBVar coeff_vars[stage][max_state][nofcoeffs]; 
+// Beta variables in PLP
+
+GRBVar Value_vars[stage][max_state]; 
+// U variables used for unbiased dual (upper) bound
+
+int zeroposition[nofcoeffs + 1] = { 0 }; 
+// Vector to store the position of the null column in the post PCA coefficient matrix
 
 static int action[stage] = { 0 };
 // Store the feasible action for each stage
@@ -305,24 +300,21 @@ double loadingcoeffs3[23][3][1][24] = { 0 };
 // Loading coefficient vectors for the basis function F_{i,j} * F_{i,j+1} for NG, corn, and ethanol 
 
 //**************************
-// Definitions of Variables
+// Definitions of Stats 
 //**************************
 double AVERAGE = 0;
 double diff_Upper_Bound = 0;
 double diff_Lower_Bound = 0;
 double variance_UpperBound = 0;
 double variance_LowerBound = 0;
-static double lower_BD = 0;
-
-double PenaltyFunction(int action, int state, int current_stage, int nofcoeffs, vector<vector<vector<double>>> &coefficient, int TotalLoop);
 
 int main(int argc, char *argv[])
 {
 	try
 	{
-		int segmentStartingPoint = 0;
 		auto start_time = high_resolution_clock::now();
 
+		// "O" -- Operational; "A" -- Abandoned; "M1" -- Mothballed
 		vector<int> vector_action_1 = { 'O' };
 		vector<int> vector_action_2 = { 'O', 'A', 'M1' };
 		vector<int> vector_action_3 = { 'O', 'A' };
@@ -343,17 +335,20 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		// Create eigenvector matrix and its inverse for the PCA
 		for (int i = 1; i < stage; i++)
 		{
 			EgenVectorMatrix[i] = new double[(nofcoeffs - 12 * (i - 1))*(nofcoeffs - 12 * (i - 1))];
 			Inv_EgenVectorMatrix[i] = new double[(nofcoeffs - 12 * (i - 1))*(nofcoeffs - 12 * (i - 1))];
 		}
 
+		// Create the coefficient matrix of the beta variables in PLP
 		for (int i = 0; i < stage; i++)
 		{
 			basisSubtraction[i] = new double[NumOfSamplePath*(nofcoeffs - 12 * (i - 1))]();
 		}
 
+		// Compute the number of beta variables
 		for (int i = 1; i < stage; i++) // i is from 1 to stage stage-1
 		{
 			if (i < stage - time_lag_reactivation)
@@ -372,78 +367,82 @@ int main(int argc, char *argv[])
 			}
 		}
 
+		// Define the RHS vector of the PLP constraints
 		double *RHS_b = new double[NumOfConstraints];
 
-		vector<vector<vector<vector<double> > > > forwardCurveSample_0; // forward curve
-		vector<vector<vector<vector<double> > > > forwardCurveSample;
+		// Define forward curves
+		vector<vector<vector<vector<double> > > > forwardCurveSample_0; // Store the initial forward curve
+		vector<vector<vector<vector<double> > > > forwardCurveSample; // Store the simulated forward curve
 
+		// Create discount factor, # of stages, # of commodities
+		// The discount factor will read from the data file
 		double discount_factor = 0;
 		int tmpPMI_nStages = stage - 1;
 		int tmpPMI_nMarkets = 1;
 		int tmpPMI_nCommodities = 3;
 
+		// Initialize the sampling process 
+		// Generate a training sample set with 70,000 forward samples
+		// Performing PCA to each endogenous state
 		Initialization(forwardCurveSample_0, forwardCurveSample, &discount_factor, &tmpPMI_nStages, &tmpPMI_nMarkets, &tmpPMI_nCommodities);
 
 		coefficient.resize(stage);
-		for (int i = 0; i < stage; i++) //NOTE :: we use coefficients starting from stage 1. 
-		{
+		for (int i = 0; i < stage; i++){ //NOTE :: we use coefficients starting from stage 1. 
 			coefficient[i].resize(max_state); // states needed approximation
-			for (int j = 0; j < max_state; j++)
-			{
+			for (int j = 0; j < max_state; j++){
 				coefficient[i][j].resize(3 * 3 * (stage - i) + 3 * (stage - i - 1) + 1); // note we insert a constant into each of the coefficient. 
-				for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - i - 1) + 1; k++)
-				{
+				for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - i - 1) + 1; k++){
 					coefficient[i][j][k] = 0;
 				}
 			}
 		}
 
-		//string solutionPath = "./Greedy_PO_No_LSM_Beta_Coefficient_" + Month + ".txt";
-		//ifstream solution(solutionPath, ios::in);
-		//for (int i = 0; i < stage; i++) //NOTE :: we use coefficients starting from stage 1. 
-		//{
-		//	for (int j = 0; j < max_state; j++)
-		//	{
-		//		for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - i - 1) + 1; k++)
-		//		{
-		//			solution >> coefficient[i][j][k];
-		//		}
-		//	}
-		//}
-		//solution.close();
+		/*string solutionPath = "./Greedy_PO_Beta_Coefficient_" + Month + ".txt";
+		ifstream solution(solutionPath, ios::in);
+		for (int i = 0; i < stage; i++) //NOTE :: we use coefficients starting from stage 1.
+		{
+			for (int j = 0; j < max_state; j++)
+			{
+				for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - i - 1) + 1; k++)
+				{
+					solution >> coefficient[i][j][k];
+				}
+			}
+		}
+		solution.close();*/
 
 		cout << "Generating the pathwise linear program (PLP)..." << endl;
+
 		auto LP_start_time = high_resolution_clock::now();
+		
+		// Initialize Gurobi
 		GRBEnv env = GRBEnv();
 		GRBModel *model = new GRBModel(env);
-		(*model).getEnv().set(GRB_IntParam_Method, 2);
-		(*model).getEnv().set(GRB_IntParam_Crossover, 0);
+		(*model).getEnv().set(GRB_IntParam_Method, 2); // Specify the interior point method
+		(*model).getEnv().set(GRB_IntParam_Crossover, 0); // Shut down the crossover process
 
-		for (int k = 0; k < NumOfSamplePath; k++)
-		{
-			for (int i = 0; i < stage; i++) // i from 0 to 23
-			{
-				for (int j = 0; j < max_state; j++) // j from 0 to 5
-				{
+		// Add the U variables
+		for (int k = 0; k < NumOfSamplePath; k++){
+			for (int i = 0; i < stage; i++){ // i from 0 to 23
+				for (int j = 0; j < max_state; j++){ // j from 0 to 3
 					switch (j)
 					{
-					case 0:   // each stage has 6 variables corresponding to the continuation function, although many of the variables may never be used. 
-					{
-						break;
-					}
-					case 1:
-					{
-						string s = "U_O_" + itos(i) + "_" + itos(k);
-						value_vars[k][i][j] = (*model).addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, s);
-						break;
-					}
-					case 2:
-					{
-						string s = "U_M1_" + itos(i) + "_" + itos(k);
-						value_vars[k][i][j] = (*model).addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, s);
-						//(*model).update();
-						break;
-					}
+						case 0: // 0 -- Abandoned
+						{
+							break;
+						}
+						case 1: // 1 -- Operational
+						{
+							string s = "U_O_" + itos(i) + "_" + itos(k);
+							value_vars[k][i][j] = (*model).addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, s);
+							break;
+						}
+						case 2: // 2 -- Mothballed
+						{
+							string s = "U_M1_" + itos(i) + "_" + itos(k);
+							value_vars[k][i][j] = (*model).addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, s);
+							break;
+						}
 					}
 				}
 			}
@@ -451,26 +450,22 @@ int main(int argc, char *argv[])
 
 		(*model).update();
 
-		for (int i = 1; i < stage; i++) // i is from 0 to stage
-		{
-			for (int k = 0; k < max_state; k++) // three states needs approximation. 
-			{
-				for (int j = 0; j < 3 * 3 * (stage - i) + 3 * (stage - i - 1); j++) // PO (*model), do not constain constant i nthe basis functions 
-				{
+		// Add the beta variables
+		for (int i = 1; i < stage; i++){ // i is from 0 to stage
+			for (int k = 0; k < max_state; k++){ // three states needs approximation. 
+				for (int j = 0; j < 3 * 3 * (stage - i) + 3 * (stage - i - 1); j++){ // 3 * 3 * (stage - i) + 3 * (stage - i - 1) is the # of beta variables at each stage
 					string s = "C_" + itos(i) + "_" + itos(k) + "_" + itos(j);
 					coeff_vars[i][k][j] = (*model).addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, s);
 				}
 			}
 		}
 
-		// Integrate variables into (*model)
 		(*model).update();
 
-		// objective function is to minimize U_O_0, which is the value function for stage 0 and state "Operation"
+		// Add the objective function
 		GRBLinExpr objective = 0;
 
-		for (int i = 0; i < NumOfSamplePath; i++)
-		{
+		for (int i = 0; i < NumOfSamplePath; i++){
 			objective += value_vars[i][0][1];
 		}
 
@@ -484,22 +479,18 @@ int main(int argc, char *argv[])
 
 		int NumOfRow = 0;
 		cout << "Adding constraints..." << endl;
-		for (int i = 1; i < stage; i++) // i is stage. We focus on the beta. So i starts from 1 and ends in the last stage but doesn't contain the last constraint.
-		{
+		for (int i = 1; i < stage; i++){ // i is stage. We focus on the beta. So i starts from 1 and ends in the last stage but doesn't contain the last constraint.
 			cout << "Stage: " << i << endl;
-			for (int j = 0; j < max_state; j++) // j is from 0 to 2
-			{
-				switch (statesForEachStage[i][j])
-				{
-					// The constraints should contain O and M from the 1st stage to the last stage.
-					// which corresponds to the beta matrix 1-1, 1-2 ... until 23-1.
+			for (int j = 0; j < max_state; j++){ // j is from 0 to 2
+				switch (statesForEachStage[i][j]){
+					// The constraints should contain "O" and "M" states from the 1st stage to the last stage.
+					// which corresponds to the beta matrix 1-1, 1-2 ... till 23-1.
 					// After states O and M, consider state A.
 				case 'A':
 					break;
 
 				case 'O':
-					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-					{
+					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 						string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 
 						ConstraintPointer[i][1].push_back((*model).addConstr(value_vars[TotalLoop][i - 1][1] >= rewardFunction('O', 'P', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]) - penaltyFunction('P', 'O', i, nofcoeffs, TotalLoop) + discount_factor * value_vars[TotalLoop][i][1], s + "_P"));
@@ -508,8 +499,7 @@ int main(int argc, char *argv[])
 						NumOfRow++;
 					}
 
-					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-					{
+					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 						string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 
 						ConstraintPointer[i][1].push_back((*model).addConstr(value_vars[TotalLoop][i - 1][1] >= rewardFunction('O', 'S', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]) - penaltyFunction('S', 'O', i, nofcoeffs, TotalLoop) + discount_factor * value_vars[TotalLoop][i][1], s + "_S"));
@@ -518,10 +508,8 @@ int main(int argc, char *argv[])
 						NumOfRow++;
 					}
 
-					if (i > time_lag_reactivation + time_lag)
-					{
-						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-						{
+					if (i > time_lag_reactivation + time_lag){
+						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 							string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 
 							ConstraintPointer[i][1].push_back((*model).addConstr(value_vars[TotalLoop][i - time_lag_reactivation][2] >= rewardFunction('M1', 'R', i - time_lag_reactivation, forwardcurve_Total[TotalLoop][i - time_lag_reactivation][0][0][0], forwardcurve_Total[TotalLoop][i - time_lag_reactivation][1][0][0], forwardcurve_Total[TotalLoop][i - time_lag_reactivation][2][0][0]) - penaltyFunction('R', 'M1', i, nofcoeffs, TotalLoop) + discount_factor * value_vars[TotalLoop][i][1], s + "_R"));
@@ -531,10 +519,8 @@ int main(int argc, char *argv[])
 						}
 					}
 
-					if (i <= time_lag_reactivation + time_lag)
-					{
-						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-						{
+					if (i <= time_lag_reactivation + time_lag){
+						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 							string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 
 							(*model).addConstr(value_vars[TotalLoop][i - 1][1] >= rewardFunction('O', 'A', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]), s + "_A");
@@ -545,8 +531,7 @@ int main(int argc, char *argv[])
 					break;
 
 				case 'M1':
-					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-					{
+					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 						string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 
 						ConstraintPointer[i][2].push_back((*model).addConstr(value_vars[TotalLoop][i - 1][1] >= rewardFunction('O', 'M', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]) - penaltyFunction('M', 'O', i, nofcoeffs, TotalLoop) + discount_factor * value_vars[TotalLoop][i][2], s + "_M"));
@@ -555,10 +540,8 @@ int main(int argc, char *argv[])
 						NumOfRow++;
 					}
 
-					if (i > time_lag_mothball)
-					{
-						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-						{
+					if (i > time_lag_mothball){
+						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 							string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 							ConstraintPointer[i][2].push_back((*model).addConstr(value_vars[TotalLoop][i - 1][2] >= rewardFunction('M1', 'M', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]) - penaltyFunction('M', 'M1', i, nofcoeffs, TotalLoop) + discount_factor * value_vars[TotalLoop][i][2], s + "_M"));
 							//ConstraintPointer[i][2].push_back((*model).addConstr(value_vars[TotalLoop][i - 1][2] >= rewardFunction('M1', 'M', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]) - PenaltyFunction('M', 'M1', i, nofcoeffs, coefficient, TotalLoop) + discount_factor * value_vars[TotalLoop][i][2], s + "_M"));
@@ -567,10 +550,8 @@ int main(int argc, char *argv[])
 						}
 					}
 
-					if (i > time_lag_mothball && i < stage - time_lag_reactivation)
-					{
-						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-						{
+					if (i > time_lag_mothball && i < stage - time_lag_reactivation){
+						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 							string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 							(*model).addConstr(value_vars[TotalLoop][i - 1][2] >= rewardFunction('M1', 'A', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]), s + "_A");
 							RHS_b[NumOfRow] = (rewardFunction('M1', 'A', i - 1, forwardcurve_Total[TotalLoop][i - 1][0][0][0], forwardcurve_Total[TotalLoop][i - 1][1][0][0], forwardcurve_Total[TotalLoop][i - 1][2][0][0]));
@@ -578,10 +559,8 @@ int main(int argc, char *argv[])
 						}
 					}
 
-					if (i <= time_lag_mothball)
-					{
-						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-						{
+					if (i <= time_lag_mothball){
+						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++){
 							string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
 							(*model).addConstr(value_vars[TotalLoop][stage - time_lag_reactivation - 1][2] >= rewardFunction('M1', 'A', stage - time_lag_reactivation - 1, forwardcurve_Total[TotalLoop][stage - time_lag_reactivation - 1][0][0][0], forwardcurve_Total[TotalLoop][stage - time_lag_reactivation - 1][1][0][0], forwardcurve_Total[TotalLoop][stage - time_lag_reactivation - 1][2][0][0]), s + "_A");
 							RHS_b[NumOfRow] = (rewardFunction('M1', 'A', stage - time_lag_reactivation - 1, forwardcurve_Total[TotalLoop][stage - time_lag_reactivation - 1][0][0][0], forwardcurve_Total[TotalLoop][stage - time_lag_reactivation - 1][1][0][0], forwardcurve_Total[TotalLoop][stage - time_lag_reactivation - 1][2][0][0]));
@@ -597,28 +576,24 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		// Note RHS_b and NumOfRow do not contain the following constraints!
-		// 
-		for (int i = 1; i < stage - 1; i++) // i is stage. We focus on the beta. So i starts from 1 and ends in the last stage but doesn't contain the last constraint.
+		// Bounding constraint for each "O" from 1 to stage
+		for (int i = 1; i < stage - 1; i++)
 		{
-			for (int j = 0; j < max_state; j++) // j is from 0 to 2
+			for (int j = 0; j < max_state; j++)
 			{
 				switch (statesForEachStage[i][j])
 				{
-					// The constraints should contain O and M from the 1st stage to the last stage.
-					// which corresponds to the beta matrix 1-1, 1-2 ... until 23-1.
-					// After states O and M, consider state A.
-				case 'A':
-					if (i >= time_lag_reactivation)
-					{
-						for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
+					case 'A':
+						if (i >= time_lag_reactivation)
 						{
-							string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
-							(*model).addConstr(value_vars[TotalLoop][i][1] >= rewardFunction('O', 'A', i, forwardcurve_Total[TotalLoop][i][0][0][0], forwardcurve_Total[TotalLoop][i][1][0][0], forwardcurve_Total[TotalLoop][i][2][0][0]), s + "_A");
-							RHS_b[NumOfRow] = (rewardFunction('O', 'A', i, forwardcurve_Total[TotalLoop][i][0][0][0], forwardcurve_Total[TotalLoop][i][1][0][0], forwardcurve_Total[TotalLoop][i][2][0][0]));
-							NumOfRow++;
+							for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
+							{
+								string s = "V_" + itos(i) + "_" + itos(j) + "_" + itos(TotalLoop);
+								(*model).addConstr(value_vars[TotalLoop][i][1] >= rewardFunction('O', 'A', i, forwardcurve_Total[TotalLoop][i][0][0][0], forwardcurve_Total[TotalLoop][i][1][0][0], forwardcurve_Total[TotalLoop][i][2][0][0]), s + "_A");
+								RHS_b[NumOfRow] = (rewardFunction('O', 'A', i, forwardcurve_Total[TotalLoop][i][0][0][0], forwardcurve_Total[TotalLoop][i][1][0][0], forwardcurve_Total[TotalLoop][i][2][0][0]));
+								NumOfRow++;
+							}
 						}
-					}
 					break;
 				case 'O':
 					break;
@@ -629,10 +604,11 @@ int main(int argc, char *argv[])
 		}
 
 		(*model).update();
-		//(*model).optimize();
-		//(*model).write("model.lp");
+		//(*model).optimize(); // If PLP is small, we can directly solve it.
+		//(*model).write("model.lp"); // If PLP is small, we can output the entire PLP
 		cout << "Delete redundant matrix and vectors..." << endl;
 
+		// Release unnecessary memory before solving PLP
 		for (int i = 0; i < NumOfSamplePath; i++)
 		{
 			for (int j = 0; j < tmpPMI_nStages + 1; j++)
@@ -651,26 +627,21 @@ int main(int argc, char *argv[])
 		}
 		delete[] forwardcurve_Total;
 
+		// Store the coefficient vector for each beta variable
 		GRBColumn col[stage][max_state][nofcoeffs];
 
-		for (int i = 1; i < stage; i++) // i is from 0 to stage
-		{
-			for (int k = 0; k < max_state; k++) // three states needs approximation. 
-			{
-				for (int j = 0; j < 3 * 3 * (stage - i) + 3 * (stage - i - 1); j++) // PO (*model), do not constain constant i nthe basis functions 
-				{
+		for (int i = 1; i < stage; i++) {
+			for (int k = 0; k < max_state; k++){
+				for (int j = 0; j < 3 * 3 * (stage - i) + 3 * (stage - i - 1); j++) {
 					col[i][k][j] = (*model).getCol(coeff_vars[i][k][j]);
 				}
 			}
 		}
 
 		cout << "Remove beta from PLP ..." << endl;
-		for (int i = 1; i < stage; i++) // i is from 0 to stage
-		{
-			for (int k = 0; k < max_state; k++) // three states needs approximation. 
-			{
-				for (int j = 0; j < 3 * 3 * (stage - i) + 3 * (stage - i - 1); j++) // PO (*model), do not constain constant i nthe basis functions 
-				{
+		for (int i = 1; i < stage; i++){ // i is from 0 to stage
+			for (int k = 0; k < max_state; k++){ // three states needs approximation. 
+				for (int j = 0; j < 3 * 3 * (stage - i) + 3 * (stage - i - 1); j++){ // PO (*model), do not constain constant i nthe basis functions 
 					(*model).remove(coeff_vars[i][k][j]);
 				}
 			}
@@ -678,6 +649,7 @@ int main(int argc, char *argv[])
 
 		(*model).update();
 		
+		// Initialize the BCD process
 		double alpha = 1;
 		double negative_alpha = -1;
 		double beta = 0;
@@ -699,13 +671,13 @@ int main(int argc, char *argv[])
 		string SequentialMinimizationPath = "./PO_BCD_ObjFunValue_Greedy_" + Month + ".txt";
 		ofstream SequentialMinimization(SequentialMinimizationPath, ios::out);
 		//*****************************************************
-		//					Iteration Start
+		//					BCD Iteration Starts
 		//*****************************************************
 
 		//****************************************************
 		// Greedy Selection Rule
 		//****************************************************
-		int Max_Block = 14;
+		int Max_Block = 7;
 		vector<vector<double>> Reduced_Cost;
 		Reduced_Cost.resize(stage);
 		for (int i = 0; i < stage; i++) {
@@ -744,6 +716,7 @@ int main(int argc, char *argv[])
 				}
 			}
 			else {
+				// Compute the reduced cost for each state
 				ReducedCost(ConstraintPointer, Reduced_Cost, basisSubtraction);
 
 				vector<double> temp_reduced_cost;
@@ -755,6 +728,7 @@ int main(int argc, char *argv[])
 					}
 				}
 
+				// Select the largest several states to update
 				sort(temp_reduced_cost.begin(), temp_reduced_cost.end());
 				double threshold = temp_reduced_cost[temp_reduced_cost.size() - Max_Block];
 
@@ -771,12 +745,10 @@ int main(int argc, char *argv[])
 			//*****************************************************************
 			// BCD Iteration
 			//*****************************************************************
-			//if (block_starting_stage == 1) {
 			Previous_Obj = Current_Obj;
-			//}
 
-			for (int i = 1; i < stage; i++) { // i is stage. We focus on the beta. So i starts from 1 and ends in the last stage but doesn't contain the last constraint.
-				for (int j = 0; j < max_state; j++) { // j is from 0 to 2
+			for (int i = 1; i < stage; i++) { 
+				for (int j = 0; j < max_state; j++) {
 					if (Block_Selected_Stage_State[i][j] == 1) {
 						for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - i - 1); k++) {
 							coefficient[i][j][k + 1] = 0;
@@ -786,6 +758,7 @@ int main(int argc, char *argv[])
 			}
 
 			vector<double> Abeta;
+
 			// Update RHS
 			for (int i = 1; i < stage; i++) {
 				int mm = NumOfSamplePath;
@@ -796,6 +769,7 @@ int main(int argc, char *argv[])
 				int LDC = mm;
 
 				if (i < stage - 1) {
+
 					//State O
 					cblas_dgemv(CblasColMajor, CblasNoTrans, mm, kk, negative_alpha, basisSubtraction[i], LDA, &coefficient[i][1][1], INCX, beta, &Penalty[0], INCY);
 					//cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, mm, nn, kk, negative_alpha, basisSubtraction[i], LDA, &coefficient[i][1][1], LDB, beta, &Penalty[0], LDC);
@@ -809,6 +783,7 @@ int main(int argc, char *argv[])
 						Abeta.insert(Abeta.end(), Penalty.begin(), Penalty.end());
 						Abeta.insert(Abeta.end(), Penalty.begin(), Penalty.end());
 					}
+
 					//State M
 					cblas_dgemv(CblasColMajor, CblasNoTrans, mm, kk, negative_alpha, basisSubtraction[i], LDA, &coefficient[i][2][1], INCX, beta, &Penalty[0], INCY);
 					//cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, mm, nn, kk, negative_alpha, basisSubtraction[i], LDA, &coefficient[i][2][1], LDB, beta, &Penalty[0], LDC);
@@ -823,7 +798,8 @@ int main(int argc, char *argv[])
 						Abeta.insert(Abeta.end(), Zero_Penalty.begin(), Zero_Penalty.end());
 					}
 				}
-				else {//last stage
+				else {
+					//last stage
 					cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, mm, nn, kk, negative_alpha, basisSubtraction[i], LDA, &coefficient[i][1][1], LDB, beta, &Penalty[0], LDC);
 					Abeta.insert(Abeta.end(), Penalty.begin(), Penalty.end());
 					Abeta.insert(Abeta.end(), Penalty.begin(), Penalty.end());
@@ -835,11 +811,11 @@ int main(int argc, char *argv[])
 				Abeta.insert(Abeta.end(), Zero_Penalty.begin(), Zero_Penalty.end());
 			}
 
-			//Update RHS
-			cblas_daxpy(Row_RHS, alpha, RHS_b, INCX, &Abeta[0], INCY);
-
+			//Incorporate the updated RHS into PLP
+ 			cblas_daxpy(Row_RHS, alpha, RHS_b, INCX, &Abeta[0], INCY);
 			(*model).set(GRB_DoubleAttr_RHS, (*model).getConstrs(), &Abeta[0], (*model).get(GRB_IntAttr_NumConstrs));
 
+			// Add penalties to the selected states
 			for (int i = 1; i < stage; i++) {
 				for (int j = 1; j < max_state; j++) {
 					if (Block_Selected_Stage_State[i][j] == 1) {
@@ -851,12 +827,14 @@ int main(int argc, char *argv[])
 				}
 			}
 
+			// Solve
 			(*model).update();
 			(*model).optimize();
 			Current_Obj = (*model).get(GRB_DoubleAttr_ObjVal);
 			cout << "OBJ: " << (*model).get(GRB_DoubleAttr_ObjVal) << endl;
 			SequentialMinimization << (*model).get(GRB_DoubleAttr_ObjVal) << endl;
 
+			// Store the solved coefficients
 			for (int i = 1; i < stage; i++) {
 				for (int j = 1; j < max_state; j++) {
 					if (Block_Selected_Stage_State[i][j] == 1) {
@@ -868,6 +846,7 @@ int main(int argc, char *argv[])
 				}
 			}
 
+			// Release the selected states
 			for (int i = 1; i < stage; i++) {
 				for (int j = 1; j < max_state; j++) {
 					if (Block_Selected_Stage_State[i][j] == 1) {
@@ -876,17 +855,12 @@ int main(int argc, char *argv[])
 				}
 			}
 			iteration++;
-		} while (fabs(Current_Obj - Previous_Obj) > 1e-3);
+		} while (fabs(Current_Obj - Previous_Obj) > 1e-2); // Stopping criteria
 		auto PO_stop_time = high_resolution_clock::now();
 
 		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-		double unbiased_upperbound = 0;
-
+		// Output the beta variable values
 		string solutionPath = "./Greedy_PO_Beta_Coefficient_" + Month + ".txt";
 		ofstream solution(solutionPath, ios::out);
 		for (int i = 0; i < stage; i++) //NOTE :: we use coefficients starting from stage 1. 
@@ -901,9 +875,19 @@ int main(int argc, char *argv[])
 		}
 		solution.close();
 
+		// Release the memory
+		delete model;
+		delete[] RHS_b;
+
+		//*******************************************************************
+		// Simulate the unbiased lower and dual (upper) bounds
+		//*******************************************************************
+		double unbiased_lowerbound = 0;
+		double unbiased_upperbound = 0;
+		// Generate sample set for the simulation, which is independent of the one for the training
 		struct_PriceModelInfo <vector<vector<vector<double>>>> tmpPMI;
-		string priceModelInitCondnInputFilePath = "/home/boy1/Ethanol_InputFile/priceModelInitCondnInputFile_" + Month + ".txt";
-		ifstream priceModelCalibInputFile_0("/home/boy1/Ethanol_InputFile/priceModelCalibInputFile.txt", ios::in);
+		string priceModelInitCondnInputFilePath = "./Ethanol_InputFile/priceModelInitCondnInputFile_" + Month + ".txt";
+		ifstream priceModelCalibInputFile_0("./Ethanol_InputFile/priceModelCalibInputFile.txt", ios::in);
 		ifstream priceModelInitCondnInputFile_0(priceModelInitCondnInputFilePath, ios::in);
 
 		initializePriceModelStructures(priceModelCalibInputFile_0,
@@ -971,10 +955,15 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		std::cout << "Generating matrix_A and matrix_b to recover the VFA" << endl;
+		std::cout << "Generating matrix_A and matrix_b to recover the VFA for the lower bound..." << endl;
 		tmpPMI.RndVarSeed = 5872345; // Make sure the random seed is identical to the one used for training set
 		
+		// Transform the P2LP beta into the original space.
+		Beta_Transformation(coefficient);
+
 		for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++) {
+
+			double U_value[stage][max_state - 1] = { 0 };
 
 			simulateForwardCurveAntitheticFM(tmpPMI, forwardCurveSample_1);
 
@@ -984,20 +973,25 @@ int main(int argc, char *argv[])
 			// Generate matrix A
 			generation_A_matrix(TotalLoop, matrix_A);
 
-			// state O: 0-P, 1-S, 2-M, 3-A
-			for (int i = 1; i < stage; i++) {
-				matrix_b[i][1][TotalLoop][0] = value_vars[TotalLoop][i][1].get(GRB_DoubleAttr_X);
-				matrix_b[i][2][TotalLoop][0] = value_vars[TotalLoop][i][2].get(GRB_DoubleAttr_X);
+			for (int current_stage = 1; current_stage < stage; current_stage++)
+			{
+				BasisSubtraction(current_stage, forwardCurveSample_1, tmpPMI, 0);
 			}
-		}// END OF TotalLOOP
 
-		delete model;
-		delete[] RHS_b;
+			// Recover U variable values based on the beta solution from PLP
+			upperbound(tmpPMI.discFactor, forwardCurveSample_1, coefficient, tmpPMI, U_value);
+			
+			for (int loop = 1; loop < stage; loop++)
+			{
+				matrix_b[loop][1][TotalLoop][0] = U_value[loop][0];
 
-		// Transform the P2LP beta into the original space.
-		Beta_Transformation(coefficient);
+				matrix_b[loop][2][TotalLoop][0] = U_value[loop][1];
+			}
+		}
 
-		//	Model_Appro.update();
+		//*************************************
+		// Estimate the unbiased upper bound
+		//*************************************
 		auto Upper_Bound_Start_Time = high_resolution_clock::now();
 		tmpPMI.RndVarSeed = 6346538;
 		for (int TotalLoop = 0; TotalLoop < numofsamples; TotalLoop++)
@@ -1022,12 +1016,6 @@ int main(int argc, char *argv[])
 				BasisSubtraction(current_stage, forwardCurveSample_1, tmpPMI, 0);
 			}
 
-			//SampleTransformation();
-
-			//BasisSubtraction_PCA();
-
-			//generation_A_matrix(TotalLoop, matrix_A);
-
 			OBJ = upperbound(tmpPMI.discFactor, forwardCurveSample_1, coefficient, tmpPMI, U_value);
 			//add constraints for every state in every stage and for every action.
 
@@ -1043,12 +1031,9 @@ int main(int argc, char *argv[])
 		auto UB_duration = duration_cast<seconds>(Upper_Bound_End_Time - Upper_Bound_Start_Time);
 		cout << "Time for estimating the UB: " << UB_duration.count() << endl;
 
-		//end_time_simulation_UB = clock();
 		/***********************************************/
 		//// Generate the lower bound
 		/************************************************/
-		//First step, generate the VFA for each state.
-		//initialization
 		VFA_coefficient.resize(stage);
 		for (int i = 0; i < stage; i++)
 		{
@@ -1080,11 +1065,8 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		// regression against point estimate upper bound 
-		// regression against point estimate upper bound 
+		// regression against the point estimate upper bound 
 		auto Lower_Bound_Start_Time = high_resolution_clock::now();
-		//cout <<"Performing least squares regression to obtain VFAs for the lower bound..."<<endl;
-		//tmpPMI.RndVarSeed = 5384751;
 		for (int i = 1; i < stage; i++) {
 			for (int j = 0; j < max_state; j++) {
 				lapack_int M = NumOfSamplePath;
@@ -1114,13 +1096,10 @@ int main(int argc, char *argv[])
 				case 'O':
 					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++) {
 						b[TotalLoop] = matrix_b[i][1][TotalLoop][0];
-						//cout << TotalLoop << endl;
-						//cout << b[TotalLoop] << endl;
 					}
 
-					//dgels_(&TRANS, &M, &N, &RHSN, matrix_a, &M, b, &M, &work, &lwork, &info);
 					LAPACKE_dgels(LAPACK_COL_MAJOR, TRANS, M, N, RHSN, matrix_a, M, b, M);
-					//cout << info << endl;
+					
 					NumofColinearity = 0;
 					for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - 1 - i) + 1; k++)
 					{
@@ -1145,11 +1124,9 @@ int main(int argc, char *argv[])
 					for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
 					{
 						b[TotalLoop] = matrix_b[i][2][TotalLoop][0];
-						//cout << b[TotalLoop] << endl;
 					}
 					LAPACKE_dgels(LAPACK_COL_MAJOR, TRANS, M, N, RHSN, matrix_a, M, b, M);
-					//dgels_(&TRANS, &M, &N, &RHSN, matrix_a, &M, b, &M, &work, &lwork, &info);
-					//cout << info << endl;
+					
 					NumofColinearity = 0;
 					for (int k = 0; k < 3 * 3 * (stage - i) + 3 * (stage - 1 - i) + 1; k++)
 					{
@@ -1175,30 +1152,26 @@ int main(int argc, char *argv[])
 			}//end of j
 		}//end of i
 
-		 /***********************/
-		 // Upper and Lower Bound
-		 /***********************/
 		tmpPMI.RndVarSeed = 6346538;
-		//int abandon_count = 0;
 		for (int TotalLoop = 0; TotalLoop < numofsamples; TotalLoop++)
 		{
 			cout << TotalLoop << endl;
-			// start from Mar. Generate sample paths. loop.
+			
 			double sum = 0;
 
+			// Generate sample paths
 			simulateForwardCurveAntitheticFM(tmpPMI, forwardCurveSample_1);
 
 			int current_stage = 0;
 
-			// generate basis functions based on the given sample path
-
+			// Generate basis functions based on the given sample path
 			basisFunction(current_stage, stage, forwardCurveSample_1);
 
 			stateSet[0] = 'O';
 
-			lowerbound(tmpPMI.discFactor, forwardCurveSample_1, VFA_coefficient, tmpPMI, segmentStartingPoint);
+			lowerbound(tmpPMI.discFactor, forwardCurveSample_1, VFA_coefficient, tmpPMI, 0);
 
-			for (int i = 0; i < stage; i++) // i is from 0 to 1 to 2, because there is i+1 in the constraints.
+			for (int i = 0; i < stage; i++)
 			{
 				greedy_policy_value[i] = rewardFunction(stateSet[i], action[i], i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0])*pow(discount_factor, i);
 			}
@@ -1208,17 +1181,17 @@ int main(int argc, char *argv[])
 				sum += greedy_policy_value[Z];
 			}
 			sample_Lower_Bound_Value[TotalLoop] = sum;
-			lower_BD += sum;
+			unbiased_lowerbound += sum;
 		}// end of LOOP
 
-		lower_BD = lower_BD / numofsamples;
+		unbiased_lowerbound = unbiased_lowerbound / numofsamples;
 		unbiased_upperbound = unbiased_upperbound / numofsamples;
 		auto Lower_Bound_End_Time = high_resolution_clock::now();
 		auto Total_End_Time = high_resolution_clock::now();
-		//end_time_simulation_LB = clock();
-		/********************************/
-		//SEM for Upper Bound
-		/********************************/
+		
+		//**********************************
+		//Standard error for the dual bound
+		//**********************************
 		for (int i = 0; i < numofsamples; i++)
 		{
 			diff_Upper_Bound += (sample_Upper_Bound_Value[i] - unbiased_upperbound)*(sample_Upper_Bound_Value[i] - unbiased_upperbound);
@@ -1227,12 +1200,12 @@ int main(int argc, char *argv[])
 		variance_UpperBound = sqrt(variance_UpperBound);
 		variance_UpperBound = variance_UpperBound / sqrt(numofsamples);
 
-		/********************************/
-		//SEM for Lower Bound
-		/********************************/
+		//***********************************
+		//Standard error for the lower bound
+		//***********************************
 		for (int i = 0; i < numofsamples; i++)
 		{
-			diff_Lower_Bound += (sample_Lower_Bound_Value[i] - lower_BD)*(sample_Lower_Bound_Value[i] - lower_BD);
+			diff_Lower_Bound += (sample_Lower_Bound_Value[i] - unbiased_lowerbound)*(sample_Lower_Bound_Value[i] - unbiased_lowerbound);
 		}
 		variance_LowerBound = diff_Lower_Bound / (numofsamples - 1);
 		variance_LowerBound = sqrt(variance_LowerBound);
@@ -1241,34 +1214,29 @@ int main(int argc, char *argv[])
 		//*******************************************************************************************
 		//Print
 		//*******************************************************************************************
-		//cout << "The estimated biased upper bound is " << model.get(GRB_DoubleAttr_ObjVal) << endl;
 		cout << "The estimated unbiased upper bound is " << unbiased_upperbound << endl;
 		cout << "The SEM for unbiased Upper Bound is " << variance_UpperBound << endl;
-		cout << "The estimated lower bound is " << lower_BD << endl;
+		cout << "The estimated lower bound is " << unbiased_lowerbound << endl;
 		cout << "The SEM for Lower Bound is " << variance_LowerBound << endl;
-		//end_time = clock();
+		
 		auto Total_duration = duration_cast<seconds>(Total_End_Time - start_time);
 		auto PCA_duration = duration_cast<seconds>(LP_start_time - start_time);
 		auto PO_duration = duration_cast<seconds>(PO_stop_time - PO_start_time);
 		auto LB_duration = duration_cast<seconds>(Lower_Bound_End_Time - Lower_Bound_Start_Time);
-		//auto UB_duration = duration_cast<seconds>(Upper_Bound_End_Time - Upper_Bound_Start_Time);
 
 		cout << "The running time is " << Total_duration.count() << endl;
-		//cout << "The Number of Abandonment before the 5th stage is " << abandon_count << endl;
-
-		//ofstream finalResult("C:\\Users\\boy1\\Desktop\\Result_PO_May.txt", ios::out);
-		string finalResultPath = "./Final_Results_Greedy_PO_No_LSM_" + Month + ".txt";
+		
+		string finalResultPath = "./Final_Results_PO_Greedy_BCD_" + Month + ".txt";
 		ofstream finalResult(finalResultPath, ios::out);
 		finalResult << "The Unbiased UB is " << unbiased_upperbound << endl;
 		finalResult << "The SEM for UB is " << variance_UpperBound << endl;
-		finalResult << "The Unbiased LB is " << lower_BD << endl;
+		finalResult << "The Unbiased LB is " << unbiased_lowerbound << endl;
 		finalResult << "The SEM for LB is " << variance_LowerBound << endl;
 		finalResult << "Time for PCA: " << PCA_duration.count() << endl;
 		finalResult << "Time for solving the PO-LP: " << PO_duration.count() << endl;
 		finalResult << "Time for estimating the UB: " << UB_duration.count() << endl;
 		finalResult << "Time for estimating the LB: " << LB_duration.count() << endl;
 		finalResult << "Time for the whole process: " << Total_duration.count() << endl;
-		//finalResult << "The Number of Abandonment before the 5th stage is " << abandon_count << endl;
 		finalResult.close();
 	}
 
@@ -1325,8 +1293,8 @@ void Initialization(vector<vector<vector<vector<double>>>>forwardCurveSample_0, 
 {
 	struct_PriceModelInfo <vector<vector<vector<double>>>> tmpPMI;
 
-	ifstream priceModelCalibInputFile_0("/home/boy1/Ethanol_InputFile/priceModelCalibInputFile.txt", ios::in);
-	string InitialForwardInputPath = "/home/boy1/Ethanol_InputFile/priceModelInitCondnInputFile_" + Month + ".txt";
+	ifstream priceModelCalibInputFile_0("./Ethanol_InputFile/priceModelCalibInputFile.txt", ios::in);
+	string InitialForwardInputPath = "./Ethanol_InputFile/priceModelInitCondnInputFile_" + Month + ".txt";
 	ifstream priceModelInitCondnInputFile_0(InitialForwardInputPath, ios::in);
 
 	initializePriceModelStructures(priceModelCalibInputFile_0,
@@ -1334,6 +1302,7 @@ void Initialization(vector<vector<vector<vector<double>>>>forwardCurveSample_0, 
 		forwardCurveSample_0,
 		tmpPMI);
 
+	// Update discount factor
 	*discount_factor = tmpPMI.discFactor;
 
 	priceModelCalibInputFile_0.close();
@@ -1371,7 +1340,7 @@ void Initialization(vector<vector<vector<vector<double>>>>forwardCurveSample_0, 
 			}
 		}
 	}
-
+	// Fix the random seed
 	tmpPMI.RndVarSeed = 5872345;
 	cout << "Generating sample paths..." << endl;
 	for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
@@ -1402,14 +1371,10 @@ void Initialization(vector<vector<vector<vector<double>>>>forwardCurveSample_0, 
 		}
 	}
 
-	/*double sum = 0;
-	for (int TotalLoop = 0; TotalLoop < NumOfSamplePath; TotalLoop++)
-	{
-	sum += forwardcurve_Total[TotalLoop][1][0][0][0];
-	}
-
-	cout << "Average is " << sum / NumOfSamplePath << endl;*/
 	cout << "Performing PCA..." << endl;
+
+	// Performing PCA to each endogenous state
+	// Note that to save the memory, we only store the eigenvector matrix
 	InputFunction();
 }
 
@@ -2069,136 +2034,6 @@ double PenaltyFunction(int action, int state, int current_stage, int nofcoeffs, 
 	}
 }
 
-double PenaltyFunction(int action, int state, int current_stage, int nofcoeffs, vector<vector<vector<double>>> &coefficient, int TotalLoop)
-{// input current_stage is i+1 from 1 to 5
-	double s = 0;
-	if (current_stage > stage - 1)
-		return s;
-	else
-	{
-		if ((state == 'O' && (action == 'P' || action == 'S')) || (state == 'M1' && action == 'R'))
-		{
-			int position = 1; // position starting from 1 since the first coefficient is the constant 0;
-			for (int i = 0; i < 3; i++)
-			{
-				// F_i_j
-				for (int j = 0; j < stage - current_stage; j++)
-				{
-					s += coefficient[current_stage][1][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-					//cout << coefficient[current_stage][1][position]<<" ";
-					//b1[current_stage][0] += basis1[current_stage][i][j] - basis1[current_stage - 1][i][j + 1];
-					position++;
-				}
-			}
-
-			// F_i_j*F_i_j
-			for (int i = 0; i < 3; i++)
-			{
-				for (int j = 0; j < stage - current_stage; j++)
-				{
-					s += coefficient[current_stage][1][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-					position++;
-				}
-			}
-
-			// last basis function
-			if (current_stage < stage - 1)
-			{
-				for (int i = 0; i < 3; i++)
-				{
-					for (int j = 0; j < stage - current_stage - 1; j++)
-					{
-						s += coefficient[current_stage][1][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-						//cout << coefficient[current_stage][1][position]<<" ";
-						//b3[current_stage][0] += (basis4[current_stage][i][j] - basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1]);
-						position++;
-					}
-				}
-			}
-
-			// F_i_j_c* F_i_j*n
-			for (int j = 0; j < stage - current_stage; j++)
-			{
-				s += coefficient[current_stage][1][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-				//cout << coefficient[current_stage][1][position]<<" ";
-				//b4[current_stage][0] += (basis3[current_stage][j][0] - basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1]);
-				position++;
-
-				s += coefficient[current_stage][1][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-				//cout << coefficient[current_stage][1][position]<<" ";
-				//b4[current_stage][0] += (basis3[current_stage][j][2] - basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1]);
-				position++;
-
-				s += coefficient[current_stage][1][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-				//b4[current_stage][0] += (basis3[current_stage][j][1] - basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1]);
-				//cout << coefficient[current_stage][1][position]<<" ";
-				position++;
-			}
-
-			//cout << endl;
-			return s;
-		}
-
-		if ((state == 'O' && action == 'M') || (state == 'M1' && action == 'M'))
-		{
-			int position = 1;
-			// F_i_j
-			for (int i = 0; i < 3; i++)
-			{
-				for (int j = 0; j < stage - current_stage; j++)
-				{
-					s += coefficient[current_stage][2][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-					//	cout << coefficient[current_stage][2][position] << " ";
-					position++;
-				}
-			}
-
-			// F_i_j*F_i_j
-			for (int i = 0; i < 3; i++)
-			{
-				for (int j = 0; j < stage - current_stage; j++)
-				{
-					s += coefficient[current_stage][2][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-					//	cout << coefficient[current_stage][2][position] << " ";
-					position++;
-				}
-			}
-
-			// last basis function
-			if (current_stage < stage - 1)
-			{
-				for (int i = 0; i < 3; i++)
-				{
-					for (int j = 0; j < stage - current_stage - 1; j++)
-					{
-						s += coefficient[current_stage][2][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-						//	cout << coefficient[current_stage][2][position] << " ";
-						position++;
-					}
-				}
-			}
-
-			// F_i_j_c* F_i_j*n
-			for (int j = 0; j < stage - current_stage; j++)
-			{
-				s += coefficient[current_stage][2][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-				//cout << coefficient[current_stage][2][position] << " ";
-				position++;
-
-				s += coefficient[current_stage][2][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-				//cout << coefficient[current_stage][2][position] << " ";
-				position++;
-
-				s += coefficient[current_stage][2][position] * basisSubtraction[current_stage][(position - 1) * NumOfSamplePath + TotalLoop];
-				//cout << coefficient[current_stage][2][position] << " ";
-				position++;
-			}
-			//	cout << endl;
-			return s;
-		}
-	}
-}
-
 //*****************************************************************************
 // Dual bound
 //*****************************************************************************
@@ -2296,7 +2131,7 @@ double upperbound(double discount_factor, vector<vector<vector<vector<double>>>>
 //*****************************************************************************
 //  Greedy Policy & Lower Bound
 //*****************************************************************************
-void lowerbound(double discount_factor, vector<vector<vector<vector<double>>>> &forwardCurveSample_1, vector<vector<vector<double>>> &coefficient, struct_PriceModelInfo<vector<vector<vector<double> > > > & tmpPMI, int segmentStartingPoint)
+void lowerbound(double discount_factor, vector<vector<vector<vector<double>>>> &forwardCurveSample_1, vector<vector<vector<double>>> &coefficient, struct_PriceModelInfo<vector<vector<vector<double> > > > & tmpPMI, int segment)
 {
 	int i = 0;// i is the stage. from 0 to 23.
 	while (i < stage)
@@ -2328,19 +2163,19 @@ void lowerbound(double discount_factor, vector<vector<vector<vector<double>>>> &
 			//Second action: Produce
 			if (i < stage - 1)
 			{
-				v2 = rewardFunction('O', 'P', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('P', 'O', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, segmentStartingPoint);
+				v2 = rewardFunction('O', 'P', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('P', 'O', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, 0);
 				//v2 = rewardFunction('O', 'P', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]);
 			}
 			//Third action: mothball, only happens before stage 19. 
 			if (i < stage - 1 - time_lag_reactivation)
 			{
-				v3 = rewardFunction('O', 'M', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('M', 'O', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, segmentStartingPoint);
+				v3 = rewardFunction('O', 'M', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('M', 'O', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, 0);
 			}
 
 			// Forth action: Suspend
 			if (i < stage - 1)
 			{
-				v4 = rewardFunction('O', 'S', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('S', 'O', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, segmentStartingPoint);
+				v4 = rewardFunction('O', 'S', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('S', 'O', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, 0);
 			}
 			if (v1 >= v2 && v1 >= v3 && v1 >= v4) // the action is abandon
 			{
@@ -2376,10 +2211,10 @@ void lowerbound(double discount_factor, vector<vector<vector<vector<double>>>> &
 		{
 			if (i < stage - 1 - time_lag_reactivation) // reward for action keeping mothballing in state M2, only happen before 20.
 			{
-				v1 = rewardFunction('M1', 'M', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('M', 'M1', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, segmentStartingPoint);
+				v1 = rewardFunction('M1', 'M', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('M', 'M1', i + 1, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, 0);
 			}
 			v2 = rewardFunction('M1', 'A', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]);
-			v3 = rewardFunction('M1', 'R', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('R', 'M1', i + time_lag_reactivation, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, segmentStartingPoint);
+			v3 = rewardFunction('M1', 'R', i, forwardCurveSample_1[i][0][0][0], forwardCurveSample_1[i][1][0][0], forwardCurveSample_1[i][2][0][0]) + discount_factor * Approximation('R', 'M1', i + time_lag_reactivation, nofcoeffs, forwardCurveSample_1, coefficient, tmpPMI, 0);
 
 			if (v1 >= v2 && v1 >= v3) // action is M, keep mothballing
 			{
@@ -2448,7 +2283,7 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 			{
 				for (int j = 0; j < stage - current_stage; j++)
 				{
-					s += coefficient[current_stage][1][position] * basis2[current_stage - 1][i][j + 1] * loadingcoeffs1[current_stage - 1][i][0][j + 1 + segmentStartingPoint];
+					s += coefficient[current_stage][1][position] * basis2[current_stage - 1][i][j + 1] * loadingcoeffs1[current_stage - 1][i][0][j + 1];
 					position++;
 				}
 			}
@@ -2460,7 +2295,7 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 				{
 					for (int j = 0; j < stage - 1 - current_stage; j++)
 					{
-						s += coefficient[current_stage][1][position] * basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1 + segmentStartingPoint];
+						s += coefficient[current_stage][1][position] * basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1];
 						position++;
 					}
 				}
@@ -2469,13 +2304,13 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 			// F_i_j_c* F_i_j*n
 			for (int j = 0; j < stage - current_stage; j++)
 			{
-				s += coefficient[current_stage][1][position] * basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][1][position] * basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1];
 				position++;
 
-				s += coefficient[current_stage][1][position] * basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][1][position] * basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1];
 				position++;
 
-				s += coefficient[current_stage][1][position] * basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][1][position] * basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1];
 				position++;
 			}
 			return s;
@@ -2504,7 +2339,7 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 			{
 				for (int j = 0; j < stage - current_stage; j++)
 				{
-					s += coefficient[current_stage][2][position] * basis2[current_stage - 1][i][j + 1] * loadingcoeffs1[current_stage - 1][i][0][j + 1 + segmentStartingPoint];
+					s += coefficient[current_stage][2][position] * basis2[current_stage - 1][i][j + 1] * loadingcoeffs1[current_stage - 1][i][0][j + 1];
 					position++;
 				}
 			}
@@ -2516,7 +2351,7 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 				{
 					for (int j = 0; j < stage - 1 - current_stage; j++)
 					{
-						s += coefficient[current_stage][2][position] * basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1 + segmentStartingPoint];
+						s += coefficient[current_stage][2][position] * basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1];
 						position++;
 					}
 				}
@@ -2525,13 +2360,13 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 			// F_i_j_c* F_i_j*n
 			for (int j = 0; j < stage - current_stage; j++)
 			{
-				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1];
 				position++;
 
-				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1];
 				position++;
 
-				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1];
 				position++;
 			}
 			return s;
@@ -2558,7 +2393,7 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 			{
 				for (int j = 0; j < stage - current_stage; j++)
 				{
-					s += coefficient[current_stage][2][position] * basis2[current_stage - 1][i][j + 1] * loadingcoeffs1[current_stage - 1][i][0][j + 1 + segmentStartingPoint];
+					s += coefficient[current_stage][2][position] * basis2[current_stage - 1][i][j + 1] * loadingcoeffs1[current_stage - 1][i][0][j + 1];
 					position++;
 				}
 			}
@@ -2570,7 +2405,7 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 				{
 					for (int j = 0; j < stage - 1 - current_stage; j++)
 					{
-						s += coefficient[current_stage][2][position] * basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1 + segmentStartingPoint];
+						s += coefficient[current_stage][2][position] * basis4[current_stage - 1][i][j + 1] * loadingcoeffs3[current_stage - 1][i][0][j + 1];
 						position++;
 					}
 				}
@@ -2579,13 +2414,13 @@ double Approximation(int action, int state, int current_stage, int nofcoeffs, ve
 			// F_i_j_c* F_i_j*n
 			for (int j = 0; j < stage - current_stage; j++)
 			{
-				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][0] * loadingcoeffs2[current_stage - 1][0][0][j + 1];
 				position++;
 
-				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][2] * loadingcoeffs2[current_stage - 1][2][0][j + 1];
 				position++;
 
-				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1 + segmentStartingPoint];
+				s += coefficient[current_stage][2][position] * basis3[current_stage - 1][j + 1][1] * loadingcoeffs2[current_stage - 1][1][0][j + 1];
 				position++;
 			}
 			return s;
@@ -2723,24 +2558,6 @@ void generation_A_matrix(int loop_of_sample_path, double*** matrix_A)
 	}
 }
 
-void Generate_Beta_Matrix(double* results, double *Beta_Matrix, int i)
-{
-	long long position = 0;
-
-	for (int ii = 1; ii < i; ii++) //NOTE :: use coefficients starting from stage 1. 
-	{
-		for (int j = 1; j < max_state; j++)
-		{
-			position += NumOfSamplePath * (nofcoeffs - 12 * (ii - 1));
-		}
-	}
-
-	// For state O
-	for (int k = 0; k < nofcoeffs - 12 * (i - 1); k++)
-	{
-		copy(results + k * NumOfSamplePath, results + k * NumOfSamplePath + NumOfSamplePath, Beta_Matrix + position + NumOfSamplePath * k);
-	}
-}
 /**************************************************************************
 * Simulates a forward curve sample for each stage using the factor model and antithetic variates
 **************************************************************************/
