@@ -269,8 +269,8 @@ int main(int argc, char *argv[])
 		struct_PriceModelInfo <vector<vector<vector<double>>>> tmpPMI;
 	
 		// Read data from files
-		string InitialForwardInputPath = "/home/boy1/Ethanol_InputFile/priceModelInitCondnInputFile_" + Month + ".txt";
-		ifstream priceModelCalibInputFile_0("/home/boy1/Ethanol_InputFile/priceModelCalibInputFile.txt", ios::in);
+		string InitialForwardInputPath = "./Ethanol_InputFile/priceModelInitCondnInputFile_" + Month + ".txt";
+		ifstream priceModelCalibInputFile_0("./Ethanol_InputFile/priceModelCalibInputFile.txt", ios::in);
 		ifstream priceModelInitCondnInputFile_0(InitialForwardInputPath, ios::in);
 
 		initializePriceModelStructures(priceModelCalibInputFile_0,
