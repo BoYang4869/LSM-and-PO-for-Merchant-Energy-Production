@@ -6,7 +6,7 @@ We study merchant energy production modeled as a compound switching and timing o
 ## Description
 This repo provides a C++ implementation of pathwise optimization in the context of merchant energy production. It applies the PCA based preconditioning step and the block coordinate descent (BCD) method to solve the large scale pathwise linear program.
 
-This code uses three packages: (i) Gurobi 7.5, (ii) LAPACKE 3.7.1, and (iii) dlib C++ machine learning package. Package (iii) is included in the src folder. However, the first two packages need additional installations. 
+The code uses three packages: (i) Gurobi 7.5, (ii) LAPACKE 3.7.1, and (iii) dlib C++ machine learning package. Package (iii) is included in the src folder. However, the first two packages need additional installations. 
 
 Gurobi can be found on the website https://www.gurobi.com/
 
