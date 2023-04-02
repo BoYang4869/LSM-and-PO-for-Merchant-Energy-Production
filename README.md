@@ -12,7 +12,7 @@ Gurobi can be found on the website https://www.gurobi.com/
 
 LAPACKE 3.7.1 is on the website https://netlib.org/lapack/lapack-3.7.1.html. Note that the BLAS package is included in LAPACKE 3.7.1.
 
-We upload Makefile to provide detailed information on how the code and packages are compiled on our machine.
+Our machine uses the GCC 4.8.5 (Red Hat 4.8.5-11) compilier and the CentOS Linux 7 operating system. We upload Makefile to provide detailed information on how the code and packages are compiled on our machine.
 
 ## How to compile and run our code:
 Step 1: Make sure that all packages have been properly installed
