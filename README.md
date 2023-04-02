@@ -16,6 +16,9 @@ We upload Makefile to provide detailed information on how the code and packages 
 
 ## How to compile and run our code:
 Step 1: Make sure that all packages have been properly installed
+
 Step 2: Change the path in the Makefile based on your installation in Step (i)
+
 Step 3: Make sure that your machine has at least 128 GB memory
+
 Step 4: Compile and run the code
