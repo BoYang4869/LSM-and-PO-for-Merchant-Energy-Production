@@ -16,7 +16,7 @@ LAPACKE 3.7.1 is on the website https://netlib.org/lapack/lapack-3.7.1.html. Not
 
 Our machine uses the GCC 4.8.5 (Red Hat 4.8.5-11) compilier and the CentOS Linux 7 operating system. We upload Makefile to provide detailed information on how the code and packages are compiled on our machine.
 
-## How to compile and run our code:
+## How to compile and run our code
 Step 1: Make sure that all packages have been properly installed
 
 Step 2: Change the Makefile, in particular the paths for libraries and headers, based on your installation in Step 1
